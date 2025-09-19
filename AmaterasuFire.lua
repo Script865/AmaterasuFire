@@ -1,94 +1,76 @@
--- سكربت AmaterasuAbility
+-- Script: AmaterasuSkill.lua
+-- حطه في StarterPlayerScripts
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
 
 -- إعدادات القدرة
-local AMATERASU_DAMAGE = 1000
-local FIRE_SIZE = Vector3.new(4, 6, 4)
-local FIRE_RADIUS = 6
-local FIRE_COLOR = Color3.fromRGB(10, 10, 10) -- أسود متوهج
+local DAMAGE = 1000
+local FIRE_SIZE = Vector3.new(4,6,4)
+local FIRE_LIFETIME = 10 -- تختفي بعد 10 ثواني
 
--- إنشاء ScreenGui + زر
+-- GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AmaterasuGUI"
+screenGui.Name = "AmaterasuGui"
 screenGui.Parent = playerGui
 
+-- زر نصي مطابق لشكل الأزرار الأصلية
 local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 150, 0, 50)
-button.Position = UDim2.new(0.5, -75, 0.9, 0)
+button.Size = UDim2.new(0,100,0,50)
+button.Position = UDim2.new(0.65,0,0.85,0) -- اضبطناه بحيث يجي جنب الأزرار الأصلية
+button.BackgroundColor3 = Color3.fromRGB(0,0,0)
+button.BackgroundTransparency = 0.3
 button.Text = "Amaterasu"
+button.TextColor3 = Color3.fromRGB(255,255,255)
 button.TextScaled = true
-button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Font = Enum.Font.SourceSansBold
 button.Parent = screenGui
 
--- دالة إنشاء النار على الهدف
-local function spawnAmaterasu(ownerPlayer, targetPlayer)
-    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local char = targetPlayer.Character
-    local hrp = char.HumanoidRootPart
+-- دالة إنشاء نار الأماتيراسو
+local function spawnAmaterasu(owner)
+    local pos = camera.CFrame.Position + camera.CFrame.LookVector * 20
 
-    -- إزالة أي قدرة سابقة
-    if char:FindFirstChild("AmaterasuEffect") then
-        char.AmaterasuEffect:Destroy()
-    end
-
-    -- Part يشبه القدرات الأصلية
     local firePart = Instance.new("Part")
-    firePart.Name = "AmaterasuEffect"
     firePart.Size = FIRE_SIZE
     firePart.Anchored = true
     firePart.CanCollide = false
     firePart.Material = Enum.Material.Neon
-    firePart.BrickColor = BrickColor.new("Really black")
-    firePart.Transparency = 0.3
-    firePart.Parent = char
+    firePart.Color = Color3.fromRGB(10,10,10) -- أسود
+    firePart.Transparency = 0.2
+    firePart.Position = pos
+    firePart.Name = "AmaterasuFire"
+    firePart.Parent = workspace
 
-    -- ParticleEmitter للنار
+    -- مؤثرات النار السوداء
     local emitter = Instance.new("ParticleEmitter")
-    emitter.Texture = "rbxassetid://243660364" -- نفس شكل القدرات الأصلية
-    emitter.Rate = 60
-    emitter.Lifetime = NumberRange.new(0.5, 1)
-    emitter.Speed = NumberRange.new(5, 8)
-    emitter.VelocitySpread = 180
-    emitter.Rotation = NumberRange.new(0, 360)
-    emitter.SpreadAngle = Vector2.new(360, 360)
+    emitter.Texture = "rbxassetid://243660364"
+    emitter.Rate = 80
+    emitter.Lifetime = NumberRange.new(0.5,1)
+    emitter.Speed = NumberRange.new(5,8)
+    emitter.Rotation = NumberRange.new(0,360)
+    emitter.SpreadAngle = Vector2.new(360,360)
     emitter.LightEmission = 1
     emitter.Parent = firePart
 
-    -- تتبع اللاعب
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if hrp.Parent then
-            firePart.Position = hrp.Position
-        else
-            firePart:Destroy()
+    -- ضرر عند اللمس
+    firePart.Touched:Connect(function(hit)
+        local character = hit.Parent
+        local hum = character and character:FindFirstChildOfClass("Humanoid")
+        local plr = hum and Players:GetPlayerFromCharacter(character)
+
+        -- ما يضر اللاعب اللي أطلق القدرة
+        if hum and plr ~= owner then
+            hum:TakeDamage(DAMAGE)
         end
     end)
 
-    -- ضرب اللاعبين الآخرين فقط
-    game:GetService("RunService").Heartbeat:Connect(function()
-        for _, other in pairs(Players:GetPlayers()) do
-            if other ~= ownerPlayer and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
-                local otherHRP = other.Character.HumanoidRootPart
-                if (otherHRP.Position - firePart.Position).Magnitude <= FIRE_RADIUS then
-                    local hum = other.Character:FindFirstChild("Humanoid")
-                    if hum then
-                        hum:TakeDamage(AMATERASU_DAMAGE)
-                    end
-                end
-            end
-        end
-    end)
+    -- حذف النار بعد 10 ثواني
+    game:GetService("Debris"):AddItem(firePart, FIRE_LIFETIME)
 end
 
--- عند الضغط على الزر
+-- ربط الزر بالقدرة (بدون كولدوان)
 button.MouseButton1Click:Connect(function()
-    local target = mouse.Target and Players:GetPlayerFromCharacter(mouse.Target.Parent)
-    if target then
-        spawnAmaterasu(player, target)
-    end
+    spawnAmaterasu(player)
 end)
